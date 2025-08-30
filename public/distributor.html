@@ -242,14 +242,18 @@ function addOrderRow() {
 
   container.appendChild(row);
 
+  // ✅ Only load options into this one select
+  const thisSelect = row.querySelector(".productSelect");
+  loadProductOptions(thisSelect);
+
   row.querySelector(".removeItemBtn").addEventListener("click", () => {
     row.remove();
     updateRemoveButtons();
   });
 
-  loadProductOptions();
   updateRemoveButtons();
 }
+
 
 // Update Remove buttons: hide if only one row
 function updateRemoveButtons() {
