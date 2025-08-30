@@ -179,53 +179,51 @@ async function loadStock() {
   }
 }
 
-// Load product options for all rows and sales dropdown
-async function loadProductOptions() {
+// Load product options for specific row or all
+async function loadProductOptions(targetSelect = null) {
   try {
     const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/distributor/products?distributorId=${distributorId}`);
     const data = await res.json();
     if (!data.products) data.products = [];
 
-    // Only products with stock
+    // Filter products with stock
     const availableProducts = data.products.filter(p => p.qty > 0);
     productMap = {};
     availableProducts.forEach(p => productMap[p.id] = p.name);
 
-    // Fill sales dropdown
+    // Fill sales dropdown (if exists)
     const salesProduct = document.getElementById("salesProduct");
-    salesProduct.innerHTML = "";
-    availableProducts.forEach(p => {
-      salesProduct.innerHTML += `<option value="${p.id}">${p.name}</option>`;
-    });
-
-    // Fill each order row dropdown
-    const orderItems = document.querySelectorAll(".order-item");
-    orderItems.forEach(row => {
-      const sel = row.querySelector(".productSelect");
-      const qtyInput = row.querySelector(".qtyInput");
-      if(!sel) return;
-
-      sel.innerHTML = "";
+    if (salesProduct) {
+      salesProduct.innerHTML = "";
       availableProducts.forEach(p => {
-        sel.innerHTML += `<option value="${p.id}" data-stock="${p.qty}">${p.name} (Stock: ${p.qty})</option>`;
+        salesProduct.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+      });
+    }
+
+    // ✅ If specific select is passed, update only that
+    if (targetSelect) {
+      const qtyInput = targetSelect.closest('.order-item').querySelector(".qtyInput");
+
+      targetSelect.innerHTML = `<option value="" disabled selected>Select Product</option>`;
+      availableProducts.forEach(p => {
+        targetSelect.innerHTML += `<option value="${p.id}" data-stock="${p.qty}">${p.name} (Stock: ${p.qty})</option>`;
       });
 
-      // Update max qty when selection changes
-      sel.onchange = () => {
-        const selected = sel.selectedOptions[0];
+      targetSelect.onchange = () => {
+        const selected = targetSelect.selectedOptions[0];
         const stock = selected ? selected.getAttribute("data-stock") : 0;
         qtyInput.max = stock;
         qtyInput.placeholder = `Max: ${stock}`;
       };
-      sel.onchange();
-    });
+
+      targetSelect.onchange();
+    }
 
   } catch (err) {
     console.error("Failed to load products", err);
   }
 }
 
-// Add a new order row
 function addOrderRow() {
   const container = document.getElementById("orderItems");
 
@@ -240,12 +238,16 @@ function addOrderRow() {
 
   container.appendChild(row);
 
+  const select = row.querySelector(".productSelect");
+
+  // ✅ Load only for this select box
+  loadProductOptions(select);
+
   row.querySelector(".removeItemBtn").addEventListener("click", () => {
     row.remove();
     updateRemoveButtons();
   });
 
-  loadProductOptions();
   updateRemoveButtons();
 }
 
