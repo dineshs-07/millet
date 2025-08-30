@@ -1073,12 +1073,13 @@ app.post('/api/distributor/confirm-delivery', async (req, res) => {
     );
 
     // ✅ Update Distributor Stock
-    const order = check[0];
+    for (const order of check) {
 await connection.query(`
   INSERT INTO distributor_stock (distributor_id, product_id, qty)
   VALUES (?, ?, ?)
   ON DUPLICATE KEY UPDATE qty = qty + VALUES(qty)
 `, [order.distributor_id, order.product_id, order.qty]);
+    }
 
     res.json({ success: true, message: "Delivery confirmed" });
   } catch (err) {
