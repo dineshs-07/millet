@@ -233,27 +233,21 @@ function addOrderRow() {
   row.className = "order-item d-flex align-items-center gap-2";
 
   row.innerHTML = `
-    <select name="productId" class="form-select productSelect" required style="max-width: 350px;">
-      <option value="" disabled selected>Select Product</option> 
-    </select>
+    <select name="productId" class="form-select productSelect" required style="max-width: 350px;"></select>
     <input type="number" name="qty" class="form-control qtyInput" required min="1" placeholder="Qty" style="max-width: 350px;" />
     <button type="button" class="btn btn-danger btn-sm removeItemBtn">✖</button>
   `;
 
   container.appendChild(row);
 
-  // ✅ Only load options into this one select
-  const thisSelect = row.querySelector(".productSelect");
-  loadProductOptions(thisSelect);
-
   row.querySelector(".removeItemBtn").addEventListener("click", () => {
     row.remove();
     updateRemoveButtons();
   });
 
+  loadProductOptions();
   updateRemoveButtons();
 }
-
 
 // Update Remove buttons: hide if only one row
 function updateRemoveButtons() {
