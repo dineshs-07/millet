@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Add Product • Millet Supply Chain</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body { background: #f5f7fa; font-family: 'Segoe UI', sans-serif; }
+    .navbar { background-color: #e8f5e9; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); }
+    .navbar-brand { font-weight: bold; font-size: 1.5rem; color: #2e7d32 !important; }
+    .sidebar { min-height: 100vh; background: #2e7d32; color: #fff; padding: 1rem; }
+    .sidebar a { color: #fff; display: block; margin-bottom: 1rem; text-decoration: none; font-weight: 500; }
+    .sidebar a:hover { text-decoration: underline; }
+    .card { border: 0; border-radius: 1rem; box-shadow: 0 6px 20px rgba(0, 0, 0, .05); }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center" href="#">
+        <img src="https://cdn-icons-png.flaticon.com/512/7651/7651380.png" height="36" class="me-2" />
+        Admin Dashboard – Millet Supply Chain
+      </a>
+    </div>
+  </nav>
+
+  <div class="d-flex">
+    <div class="sidebar">
+      <h4 class="mb-4">📁 Admin Menu</h4>
+      <a href="admin.html">📊 Overview</a>
+      <a href="add-product.html">➕ Add Product</a>
+      <a href="add-warehouse.html">🏢 Add Warehouse</a>
+      <a href="add-distributor.html">👤 Add Distributor</a>
+      <a href="index.html">🚪 Logout</a>
+    </div>
+
+    <div class="flex-grow-1 p-4">
+      <div class="card mb-4">
+        <div class="card-header fw-bold">➕ Add New Product</div>
+        <div class="card-body">
+          <form id="productForm">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="productName" class="form-label">Product Name</label>
+                <input type="text" class="form-control" id="productName" name="productName" required />
+              </div>
+              <div class="col-md-6">
+                <label for="sku" class="form-label">SKU Code</label>
+                <input type="text" class="form-control" id="sku" name="sku" required />
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="ean" class="form-label">EAN Code</label>
+                <input type="text" class="form-control" id="ean" name="ean" required />
+              </div>
+              <div class="col-md-6">
+                <label for="unit" class="form-label">Unit</label>
+                <input type="text" class="form-control" id="unit" name="unit" required />
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="quantity" class="form-label">Quantity</label>
+                <input type="number" class="form-control" id="quantity" name="quantity" required />
+              </div>
+              <div class="col-md-6">
+                <label for="mrp" class="form-label">MRP (₹)</label>
+                <input type="number" step="0.01" class="form-control" id="mrp" name="mrp" required />
+              </div>
+              <div class="col-md-6">
+                <label for="mrp" class="form-label">Selling Price (₹)</label>
+                <input type="number" step="0.01" class="form-control" id="sellingprice" name="sellingprice" required />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success px-4">Add Product</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header fw-bold">📋 Recently Added Products</div>
+        <div class="card-body">
+          <div id="productList">
+            <table class="table table-bordered table-striped">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>SKU</th>
+                  <th>EAN</th>
+                  <th>Unit</th>
+                  <th>Qty</th>
+                  <th>MRP</th>
+                  <th>SELLING PRICE</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="productTableBody">
+                <tr><td colspan="7" class="text-muted">Loading products...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("productForm");
+
+    form.onsubmit = async function (e) {
+      e.preventDefault();
+
+      const pName = document.getElementById("productName").value;
+      const sku = document.getElementById("sku").value;
+      const ean = document.getElementById("ean").value;
+      const unit = document.getElementById("unit").value;
+      const qty = document.getElementById("quantity").value;
+      const mrp = document.getElementById("mrp").value;
+      const sellingprice = document.getElementById("sellingprice").value;
+
+      try {
+        const response = await fetch("https://millet-backend-t5d4.onrender.com/api/product", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pName, sku, ean, unit, qty, mrp, sellingprice })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert("✅ Product added successfully!");
+          form.reset();
+          loadProducts();
+        } else {
+          alert("❌ Failed: " + data.message);
+        }
+      } catch (err) {
+        console.error("❌ Error submitting form:", err);
+        alert("❌ Server or network error. Check console.");
+      }
+    };
+
+    // make loadProducts global
+    window.loadProducts = async function () {
+      try {
+        const res = await fetch("https://millet-backend-t5d4.onrender.com/api/products");
+        const data = await res.json();
+
+        const tableBody = document.getElementById("productTableBody");
+        tableBody.innerHTML = "";
+
+        if (data.success && Array.isArray(data.products)) {
+          data.products.forEach((product, index) => {
+            const row = `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${product.name}</td>
+                <td>${product.sku}</td>
+                <td>${product.ean}</td>
+                <td>${product.unit}</td>
+                <td>${product.qty}</td>
+                <td>₹${product.mrp}</td>
+                <td>₹${product.sellingprice}</td>
+                <td>
+                  <button class="btn btn-sm btn-warning me-1" onclick="editProduct(${product.id})">✏ Edit</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteProduct(${product.id})">🗑 Delete</button>
+                </td>  
+              </tr>
+            `;
+            tableBody.innerHTML += row;
+          });
+        } else {
+          tableBody.innerHTML = `<tr><td colspan="9" class="text-danger">No products found</td></tr>`;
+        }
+      } catch (err) {
+        console.error("❌ Load error:", err);
+        const tableBody = document.getElementById("productTableBody");
+        tableBody.innerHTML = `<tr><td colspan="9" class="text-danger">❌ Could not load products</td></tr>`;
+      }
+    };
+
+    loadProducts();
+  });
+
+  // make delete and edit global
+  async function deleteProduct(id) {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+
+    try {
+      const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/product/${id}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        alert("🗑 Product deleted successfully!");
+        loadProducts();
+      } else {
+        alert("❌ Delete failed: " + data.message);
+      }
+    } catch (err) {
+      console.error("❌ Delete error:", err);
+      alert("❌ Server or network error while deleting.");
+    }
+  }
+
+  async function editProduct(id) {
+    const newName = prompt("Enter new product name:");
+    const newMRP = prompt("Enter new mrp:");
+    const newSellingPrice = prompt("Enter new selling price:");
+
+    if (!newName || !newMRP || !newSellingPrice) return;
+
+    try {
+      const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/product/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName, mrp: newMRP, sellingprice: newSellingPrice })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        alert("✏ Product updated successfully!");
+        loadProducts();
+      } else {
+        alert("❌ Update failed: " + data.message);
+      }
+    } catch (err) {
+      console.error("❌ Edit error:", err);
+      alert("❌ Server or network error while updating.");
+    }
+  }
+</script>
+
+</body>
+</html>

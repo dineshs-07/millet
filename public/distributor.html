@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Distributor Dashboard • Millet Supply Chain</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+<style>
+body { background: #f5f7fa; font-family: 'Segoe UI', sans-serif; }
+.navbar { background-color: #e8f5e9; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+.navbar-brand { font-weight: bold; font-size: 1.5rem; color: #2e7d32 !important; }
+.sidebar { min-height: 100vh; background: #2e7d32; color: #fff; padding: 1rem; }
+.sidebar a { color: #fff; display: block; margin-bottom: 1rem; text-decoration: none; font-weight: 500; }
+.sidebar a:hover { text-decoration: underline; }
+.card { border: 0; border-radius: 1rem; box-shadow: 0 6px 20px rgba(0,0,0,.05); }
+.card-header { background-color: #e8f5e9; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center" href="#">
+      <img src="https://cdn-icons-png.flaticon.com/512/7651/7651380.png" height="36" class="me-2" />
+      Distributor Dashboard – Millet Supply Chain
+    </a>
+    <span class="ms-3 text-success" id="warehouseName"></span>
+  </div>
+</nav>
+
+<div class="d-flex">
+  <div class="sidebar">
+    <h4 class="mb-4">🚚 Distributor Menu</h4>
+    <a href="#" onclick="showSection('stock')">📦 My Stock</a>
+    <a href="#" onclick="showSection('placeOrder')">📝 Place Order</a>
+    <a href="#" onclick="showSection('orderHistory')">📜 Order History</a>
+    <a href="#" onclick="showSection('sales')">💰 Sales Entry</a>
+    <a href="index.html">🚪 Logout</a>
+  </div>
+
+  <div class="flex-grow-1 p-4">
+
+    <!-- My Stock -->
+    <div class="card mb-4" id="stock">
+      <div class="card-header">📦 Current Stock</div>
+      <div class="card-body">
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product</th>
+              <th>SKU</th>
+              <th>Qty Available</th>
+              <th>MRP</th>
+            </tr>
+          </thead>
+          <tbody id="stockTable"><tr><td colspan="6" class="text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Place Order -->
+<div class="card mb-4" id="placeOrder" style="display:none">
+  <div class="card-header">📝 Place New Order</div>
+  <div class="card-body">
+    <form id="orderForm">
+
+      <!-- Row container -->
+      <div id="orderItems" class="d-flex flex-column gap-3 mb-3"></div>
+
+      <!-- Bottom buttons: Add + Place Order -->
+      <div class="d-flex justify-content-between">
+        <button type="button" id="addProductBtn" class="btn btn-primary btn-sm">+ Add Product</button>
+        <button type="submit" class="btn btn-success">Place Order</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+
+    <!-- Order History -->
+    <div class="card mb-4" id="orderHistory" style="display:none">
+      <div class="card-header">📜 Order History</div>
+      <div class="card-body">
+        <table class="table table-striped">
+          <thead><tr><th>#</th><th>Warehouse</th><th>Distributor</th><th>Product</th><th>Qty</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+          <tbody id="historyTable"><tr><td colspan="8" class="text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sales Entry -->
+<div class="card" id="sales" style="display:none">
+  <div class="card-header">💰 Enter Sales</div>
+  <div class="card-body">
+    <form id="salesForm">
+
+      <!-- Multiple sale rows here -->
+      <div id="salesItems" class="d-flex flex-column gap-3 mb-3"></div>
+
+      <!-- Add / Save -->
+      <div class="d-flex justify-content-between">
+        <button type="button" id="addSaleRowBtn" class="btn btn-primary btn-sm">+ Add Product</button>
+        <button type="submit" class="btn btn-success">Record Sales</button>
+      </div>
+
+    </form><br><br>
+ 
+
+<!-- Sales Summary -->
+<div class="card mb-4" id="salesSummary">
+  <div class="card-header">📊 Sales Summary</div>
+  <div class="card-body">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Sale ID</th>
+          <th>Distributor</th>
+          <th>Products</th>
+          <th>Qty</th>
+          <th>Final Amount</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="salesSummaryTable">
+        <tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+ </div>
+</div>
+
+  </div>
+</div>
+
+<script>
+let distributorId = localStorage.getItem("distributorId") || 1;
+let distributorName = "Distributor";
+let warehouseName = "";
+let productMap = {};
+let warehouseStock = [];
+let pendingOrdersMap = {}; // productId => pendingQty
+
+function showSection(id) {
+  ['stock', 'placeOrder', 'orderHistory', 'sales'].forEach(s => {
+    document.getElementById(s).style.display = s === id ? 'block' : 'none';
+  });
+  if (id === 'stock') renderStockTable();
+  if (id === 'orderHistory') loadHistory();
+  if (id === 'sales') loadSales();
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadDistributorInfo();
+  await loadStock();
+  addOrderRow(); // first row
+  addSaleRow();  // ✅ for Sales Entry
+  await updateSalesSummaryTable();
+  showSection('stock');
+
+  document.getElementById("addProductBtn").addEventListener("click", addOrderRow);
+  document.getElementById("addSaleRowBtn").addEventListener("click", addSaleRow);
+});
+
+// Load distributor info
+async function loadDistributorInfo() {
+  try {
+    const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/distributor/info?distributorId=${distributorId}`);
+    const data = await res.json();
+    distributorName = data.data.name || "Distributor";
+    warehouseName = data.data.warehouse || "Unknown Warehouse";
+    document.getElementById("warehouseName").textContent = `Warehouse: ${warehouseName}`;
+  } catch (err) {
+    console.error(err);
+    document.getElementById("warehouseName").textContent = `Warehouse: Unknown`;
+  }
+}
+
+// Load stock + pending orders
+async function loadStock() {
+  try {
+    const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/distributor/stock?distributorId=${distributorId}`);
+    const data = await res.json();
+    warehouseStock = data.stock || [];
+    productMap = {};
+    warehouseStock.forEach(item => productMap[item.productId] = item.productName);
+
+    pendingOrdersMap = {};
+    const ordersRes = await fetch(`https://millet-backend-t5d4.onrender.com/api/distributor/orders?distributorId=${distributorId}`);
+    const ordersData = await ordersRes.json();
+    ordersData.orders.forEach(o => {
+      if (o.status.toLowerCase() !== 'delivered') {
+        pendingOrdersMap[o.productId] = (pendingOrdersMap[o.productId] || 0) + o.qty;
+      }
+    });
+
+    renderStockTable();
+    await loadProductOptions();
+    loadHistory();
+  } catch (err) {
+    console.error(err);
+    document.getElementById("stockTable").innerHTML = `<tr><td colspan="6" class="text-danger">Failed to load stock.</td></tr>`;
+  }
+}
+
+// Load product options for specific row or all
+async function loadProductOptions(targetSelect = null) {
+  try {
+    const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/distributor/products?distributorId=${distributorId}`);
+    const data = await res.json();
+    if (!data.products) data.products = [];
+
+    // Filter products with stock
+    const availableProducts = data.products.filter(p => p.qty > 0);
+    productMap = {};
+    availableProducts.forEach(p => productMap[p.id] = p.name);
+
+    // Fill sales dropdown (if exists)
+    const salesProduct = document.getElementById("salesProduct");
+    if (salesProduct) {
+      salesProduct.innerHTML = "";
+      availableProducts.forEach(p => {
+        salesProduct.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+      });
+    }
+
+    // ✅ If specific select is passed, update only that
+    if (targetSelect) {
+      const qtyInput = targetSelect.closest('.order-item').querySelector(".qtyInput");
+
+      targetSelect.innerHTML = `<option value="" disabled selected>Select Product</option>`;
+      availableProducts.forEach(p => {
+        targetSelect.innerHTML += `<option value="${p.id}" data-stock="${p.qty}">${p.name} (Stock: ${p.qty})</option>`;
+      });
+
+      targetSelect.onchange = () => {
+        const selected = targetSelect.selectedOptions[0];
+        const stock = selected ? selected.getAttribute("data-stock") : 0;
+        qtyInput.max = stock;
+        qtyInput.placeholder = `Max: ${stock}`;
+      };
+
+      targetSelect.onchange();
+    }
+
+  } catch (err) {
+    console.error("Failed to load products", err);
+  }
+}
+
+function addOrderRow() {
+  const container = document.getElementById("orderItems");
+
+  const row = document.createElement("div");
+  row.className = "order-item d-flex align-items-center gap-2";
+
+  row.innerHTML = `
+    <select name="productId" class="form-select productSelect" required style="max-width: 350px;"></select>
+    <input type="number" name="qty" class="form-control qtyInput" required min="1" placeholder="Qty" style="max-width: 350px;" />
+    <button type="button" class="btn btn-danger btn-sm removeItemBtn">✖</button>
+  `;
+
+  container.appendChild(row);
+
+  const select = row.querySelector(".productSelect");
+
+  // ✅ Load only for this select box
+  loadProductOptions(select);
+
+  row.querySelector(".removeItemBtn").addEventListener("click", () => {
+    row.remove();
+    updateRemoveButtons();
+  });
+
+  updateRemoveButtons();
+}
+
+// Update Remove buttons: hide if only one row
+function updateRemoveButtons() {
+  const rows = document.querySelectorAll(".order-item");
+  rows.forEach(row => {
+    const btn = row.querySelector(".removeItemBtn");
+    btn.style.display = rows.length === 1 ? "none" : "inline-block";
+  });
+}
+
+// Add a new Sale Row
+function addSaleRow() {
+  if (!warehouseStock || warehouseStock.length === 0) {
+    alert("No products available in stock to add.");
+    return;
+  }
+
+  const container = document.getElementById("salesItems");
+
+  const row = document.createElement("div");
+  row.className = "sale-item d-flex align-items-center gap-2 mb-2";
+
+  row.innerHTML = `
+    <select name="productId" class="form-select saleProduct" required style="max-width: 200px;"></select>
+    <input type="number" name="qty" class="form-control saleQty" required min="1" placeholder="Qty" style="max-width: 70px;" />
+    <input type="number" name="mrp" class="form-control saleMRP" readonly placeholder="MRP" style="max-width: 100px;" />
+    <input type="number" name="discount" class="form-control saleDiscount" min="0" step="0.01" placeholder="Discount" style="max-width: 100px;" />
+    <input type="number" name="finalValue" class="form-control saleValue" readonly placeholder="Value" style="max-width: 120px;" />
+    <button type="button" class="btn btn-danger btn-sm removeSaleBtn">✖</button>
+  `;
+
+  container.appendChild(row);
+
+  const select = row.querySelector(".saleProduct");
+  const qtyInput = row.querySelector(".saleQty");
+  const mrpInput = row.querySelector(".saleMRP");
+  const discountInput = row.querySelector(".saleDiscount");
+  const valueInput = row.querySelector(".saleValue");
+
+  // Populate product dropdown
+  select.innerHTML = `<option value="" disabled selected>Select Product</option>`;
+  warehouseStock.forEach(p => {
+    select.innerHTML += `<option value="${p.productId}" data-stock="${p.QtyAvailable}" data-mrp="${p.MRP}">${p.productName} (Stock: ${p.QtyAvailable})</option>`;
+  });
+
+  select.onchange = () => {
+    const selected = select.selectedOptions[0];
+    const stock = parseInt(selected?.getAttribute("data-stock") || "0");
+    const mrp = parseFloat(selected?.getAttribute("data-mrp") || "0");
+
+    qtyInput.max = stock;
+    qtyInput.value = "";
+    qtyInput.placeholder = `Max: ${stock}`;
+
+    mrpInput.value = mrp.toFixed(2);
+    discountInput.value = "";
+    valueInput.value = "";
+  };
+
+  function updateFinalValue() {
+    const qty = parseFloat(qtyInput.value) || 0;
+    const mrp = parseFloat(mrpInput.value) || 0;
+    const discount = parseFloat(discountInput.value) || 0;
+    valueInput.value = ((mrp - discount) * qty).toFixed(2);
+  }
+
+  qtyInput.addEventListener("input", updateFinalValue);
+  discountInput.addEventListener("input", updateFinalValue);
+
+  row.querySelector(".removeSaleBtn").addEventListener("click", () => {
+    row.remove();
+    updateSaleRemoveButtons();
+  });
+
+  updateSaleRemoveButtons();
+}
+
+function updateSaleRemoveButtons() {
+  const rows = document.querySelectorAll(".sale-item");
+  rows.forEach(row => {
+    const btn = row.querySelector(".removeSaleBtn");
+    btn.style.display = rows.length === 1 ? "none" : "inline-block";
+  });
+}
+
+// Render stock table
+function renderStockTable() {
+  const tbody = document.getElementById("stockTable");
+  tbody.innerHTML = "";
+  if (!warehouseStock.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No stock found.</td></tr>`;
+    return;
+  }
+  warehouseStock.forEach((item, i) => {
+    tbody.innerHTML += `<tr>
+      <td>${i+1}</td>
+      <td>${item.productName}</td>
+      <td>${item.SKU}</td>
+      <td>${item.QtyAvailable}</td>
+      <td>₹${item.MRP}</td>
+    </tr>`;
+  });
+}
+
+// Place order
+document.getElementById("orderForm").addEventListener("submit", async function(e) {
+  e.preventDefault();
+  const orderItems = document.querySelectorAll(".order-item");
+  if(orderItems.length === 0) return alert("Add at least one product");
+
+  const items = [];
+  for(const row of orderItems) {
+    const productSelect = row.querySelector(".productSelect");
+    const qtyInput = row.querySelector(".qtyInput");
+    const productId = productSelect.value;
+    const qty = parseInt(qtyInput.value, 10);
+
+    if(!productId) return alert("Select product for all rows");
+    if(!qty || qty <= 0) return alert("Enter valid quantity");
+    if(qty > parseInt(qtyInput.max || "9999")) return alert(`Cannot order more than available stock (${qtyInput.max})`);
+
+    items.push({ productId, qty });
+  }
+
+  try {
+    const res = await fetch("https://millet-backend-t5d4.onrender.com/api/distributor/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ distributorId, items })
+    });
+    const data = await res.json();
+    if(!data.success) throw new Error(data.error || "Failed to place order");
+
+    // Log each product
+    for(const item of items) {
+      const productName = productMap[item.productId] || "Unknown";
+      await fetch("https://millet-backend-t5d4.onrender.com/api/activity-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: distributorName, description: `📝 Placed order for ${item.qty} units of ${productName}` })
+      });
+    }
+
+    alert("✅ Order placed successfully!");
+    this.reset();
+    document.getElementById("orderItems").innerHTML = "";
+    addOrderRow(); // add fresh row
+
+    await loadStock();
+    await loadProductOptions();
+    loadHistory();
+    showSection("orderHistory");
+
+  } catch(err) {
+    console.error(err);
+    alert("❌ Failed: " + err.message);
+  }
+});
+
+// Sales Entry
+document.getElementById("salesForm").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const rows = document.querySelectorAll(".sale-item");
+  if (rows.length === 0) return alert("Add at least one product");
+
+  const items = [];
+
+  // Collect sales data
+  for (const row of rows) {
+    const select = row.querySelector(".saleProduct");
+    const qtyInput = row.querySelector(".saleQty");
+    const mrpInput = row.querySelector(".saleMRP");
+    const discountInput = row.querySelector(".saleDiscount");
+    const valueInput = row.querySelector(".saleValue");
+
+    if (!select.value || !qtyInput.value) continue;
+
+    const productId = parseInt(select.value);
+    const qty = parseInt(qtyInput.value, 10);
+    const mrp = parseFloat(mrpInput.value) || 0;
+    const discount = parseFloat(discountInput.value) || 0;
+    const final_value = parseFloat(valueInput.value) || 0;
+    const maxStock = parseInt(select.selectedOptions[0].getAttribute("data-stock") || "0");
+
+    if (!productId || !qty || qty <= 0) continue;
+    if (qty > maxStock) {
+      qtyInput.focus();
+      return alert(`Cannot sell more than available stock (${maxStock})`);
+    }
+
+    items.push({ productId, qty, mrp, discount, final_value });
+  }
+
+  if (items.length === 0) return alert("Add at least one valid product with quantity");
+
+  try {
+    // ✅ Send all sales as one POST with items array
+    const res = await fetch("https://millet-backend-t5d4.onrender.com/api/distributor/sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ distributorId: parseInt(distributorId), items })
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "Failed to record sales");
+
+    // Activity log for each item
+    for (const item of items) {
+      const productName = productMap[item.productId] || "Unknown";
+      await fetch("https://millet-backend-t5d4.onrender.com/api/activity-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: distributorName, description: `Sold ${item.qty} units of ${productName}` })
+      });
+    }
+
+    alert("✅ Sales recorded!");
+    this.reset();
+    document.getElementById("salesItems").innerHTML = "";
+    addSaleRow();
+    await loadStock();
+    renderStockTable();
+    await updateSalesSummaryTable();
+    showSection('sales');
+
+  } catch (err) {
+    console.error(err);
+    alert("❌ Failed to record sales: " + err.message);
+  }
+});
+
+async function updateSalesSummaryTable() {
+  try {
+    const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/distributor/sales?distributorId=${distributorId}`);
+    const data = await res.json();
+    const tbody = document.getElementById("salesSummaryTable");
+    tbody.innerHTML = "";
+
+    if (!data.sales || !data.sales.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No sales found</td></tr>`;
+      return;
+    }
+
+    data.sales.forEach(sale => {
+      const productsStr = sale.items.map(i => `(${i.product_name}*${i.qty})`).join(" ");
+      const totalQty = sale.items.reduce((sum, i) => sum + i.qty, 0);
+      const totalAmount = sale.items.reduce((sum, i) => sum + i.final_value, 0);
+      const dateStr = new Date(sale.created_at).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata"
+      });  
+
+      tbody.innerHTML += `<tr>
+        <td>${sale.sale_id}</td>
+        <td>${distributorName || distributor_name}</td>
+        <td>${productsStr}</td>
+        <td>${totalQty}</td>
+        <td>₹${totalAmount.toFixed(2)}</td>
+        <td>${dateStr}</td>
+      </tr>`;
+    });
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+
+// Load Order History (grouped by order_id)
+async function loadHistory() {
+  try {
+    const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/distributor/orders?distributorId=${distributorId}`);
+    const data = await res.json();
+    const tbody = document.getElementById("historyTable");
+    tbody.innerHTML = "";
+
+    if (!data.orders || data.orders.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">No orders found</td></tr>`;
+      return;
+    }
+
+    // Group orders by order_id
+    const groupedOrders = {};
+    data.orders.forEach(o => {
+      if (!groupedOrders[o.order_id]) {
+        groupedOrders[o.order_id] = {
+          warehouse: o.warehouse_name || '-',
+          distributor: o.distributor_name || '-',
+          products: [],
+          status: o.status,
+          date: o.created_at
+        };
+      }
+      groupedOrders[o.order_id].products.push({ name: o.product_name, qty: o.qty });
+    });
+
+    // Render grouped orders
+    let idx = 1;
+    for (const orderId in groupedOrders) {
+      const o = groupedOrders[orderId];
+      const productsStr = o.products.map(p => `(${p.name}*${p.qty})`).join("");
+      const totalQty = o.products.reduce((sum, p) => sum + p.qty, 0);
+
+      const actionHtml = o.status.toLowerCase() === "pending" ? "—" :
+                         o.status.toLowerCase() === "shipped" ? `<button class="btn btn-sm btn-success" onclick="confirmDelivery('${orderId}')">✅ Confirm Delivered</button>` :
+                         `<span class="badge bg-success">✅ Done</span>`;
+
+      tbody.innerHTML += `<tr>
+        <td>${idx++}</td>
+        <td>${o.warehouse}</td>
+        <td>${o.distributor}</td>
+        <td>${productsStr}</td>
+        <td>${totalQty}</td>
+        <td>${o.status}</td>
+        <td>${o.date}</td>
+        <td>${actionHtml}</td>
+      </tr>`;
+    }
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("historyTable").innerHTML = `<tr><td colspan="8" class="text-center text-danger">Failed to load orders</td></tr>`;
+  }
+}
+
+// Confirm delivery
+async function confirmDelivery(orderId){
+  if(!orderId) return alert("Invalid order ID");
+  if(!confirm("Confirm delivery?")) return;
+
+  try{
+    const res = await fetch("https://millet-backend-t5d4.onrender.com/api/distributor/confirm-delivery",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({orderId})
+    });
+    const data = await res.json();
+    if(data.success){
+      alert("✅ Delivery confirmed!");
+      await loadHistory();
+      await loadStock();
+    } else alert("❌ Failed: "+(data.message||"Unknown error"));
+  } catch(err){
+    console.error(err);
+    alert("❌ Network error");
+  }
+}
+
+// Load Sales (optional)
+async function loadSales(){
+  try{
+    const res = await fetch(`https://millet-backend-t5d4.onrender.com/api/distributor/sales?distributorId=${distributorId}`);
+    const data = await res.json();
+    console.log("Sales data", data.sales||[]);
+  } catch(err){
+    console.error(err);
+  }
+}
+</script>
+</body>
+</html>
